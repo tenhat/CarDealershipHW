@@ -5,17 +5,44 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.TreeSet;
+import java.util.logging.FileHandler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
 
+/**
+ * Car dealership that loads vehicles from a file and prints an inventory report.
+ */
 public class Dealership {
+    private static final Logger LOGGER = Logger.getLogger(Dealership.class.getName());
+
     private final TreeSet<Vehicle> vehicles = new TreeSet<>();
 
+    /**
+     * Starts the program: sets up file logging, loads the vehicles and runs the report.
+     *
+     * @param args command line arguments (not used)
+     */
     public static void main(String[] args) {
+        try {
+            FileHandler fileHandler = new FileHandler("cardealerApp.log", true);
+            fileHandler.setFormatter(new SimpleFormatter());
+            Logger.getLogger("").addHandler(fileHandler);
+        } catch (IOException error) {
+            LOGGER.log(Level.SEVERE, "Could not open the log file cardealerApp.log", error);
+        }
+        LOGGER.info("Dealership.main() called with " + args.length + " arguments");
         Dealership dealership = new Dealership();
         dealership.loadVehicles();
         dealership.runReport();
     }
 
+    /**
+     * Loads the vehicles from vehicles.txt. If the file cannot be read or is invalid,
+     * sample vehicles are used instead.
+     */
     private void loadVehicles() {
+        LOGGER.info("loadVehicles() called");
         try (BufferedReader reader = Files.newBufferedReader(Path.of("vehicles.txt"))) {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -23,13 +50,22 @@ public class Dealership {
             }
             if (vehicles.isEmpty()) throw new IOException("The input file is empty");
         } catch (IOException | IllegalArgumentException error) {
+            LOGGER.log(Level.SEVERE, "Could not load vehicles.txt, using sample vehicles", error);
             System.err.println("Could not load vehicles.txt; using sample vehicles: " + error.getMessage());
             vehicles.clear();
             addFallbackVehicles();
         }
     }
 
+    /**
+     * Creates a vehicle from one line of the input file.
+     *
+     * @param line a line in the format TYPE#Brand Model#price#age#km#fuel[#capacity#heatPump]
+     * @return the created vehicle
+     * @throws IllegalArgumentException if the line is invalid
+     */
     private Vehicle parseVehicle(String line) {
+        LOGGER.info("parseVehicle() called with line=" + line);
         String[] parts = line.split("#");
         if (parts.length != 6 && parts.length != 8) {
             throw new IllegalArgumentException("Invalid row: " + line);
@@ -58,14 +94,22 @@ public class Dealership {
         throw new IllegalArgumentException("Unknown vehicle type: " + line);
     }
 
+    /**
+     * Adds two sample vehicles to the inventory.
+     */
     private void addFallbackVehicles() {
+        LOGGER.info("addFallbackVehicles() called");
         vehicles.add(new Vehicle("Toyota", "Corolla", 5_500_000, 4,
                 75_000, Vehicle.FuelType.HYBRID));
         vehicles.add(new ElectricVehicle("Nissan", "Leaf", 4_800_000, 5,
                 65_000, 40, false));
     }
 
+    /**
+     * Builds the report, prints it and writes it to outputDealership.txt.
+     */
     private void runReport() {
+        LOGGER.info("runReport() called");
         StringBuilder report = new StringBuilder();
         appendFleetAverage(report);
         appendCheapest(report);
@@ -80,23 +124,42 @@ public class Dealership {
         try {
             Files.writeString(Path.of("outputDealership.txt"), text);
         } catch (IOException error) {
+            LOGGER.log(Level.SEVERE, "Could not write the report to outputDealership.txt", error);
             System.err.println("Could not write outputDealership.txt: " + error.getMessage());
         }
     }
 
+    /**
+     * Appends the average mileage of the fleet to the report.
+     *
+     * @param report the report being built
+     */
     private void appendFleetAverage(StringBuilder report) {
+        LOGGER.info("appendFleetAverage() called");
         double totalKm = 0;
         for (Vehicle vehicle : vehicles) totalKm += vehicle.getKm();
         report.append("1. Fleet Average Mileage: ")
                 .append(totalKm / vehicles.size()).append(" km\n");
     }
 
+    /**
+     * Appends the cheapest vehicle to the report.
+     *
+     * @param report the report being built
+     */
     private void appendCheapest(StringBuilder report) {
+        LOGGER.info("appendCheapest() called");
         report.append("2. Cheapest Vehicle: ")
                 .append(vehicles.first()).append('\n');
     }
 
+    /**
+     * Appends the most expensive electric vehicle to the report.
+     *
+     * @param report the report being built
+     */
     private void appendTopElectric(StringBuilder report) {
+        LOGGER.info("appendTopElectric() called");
         ElectricVehicle top = null;
         for (Vehicle vehicle : vehicles) {
             if (vehicle instanceof ElectricVehicle) {
@@ -117,13 +180,25 @@ public class Dealership {
         }
     }
 
+    /**
+     * Appends the total value of the inventory to the report.
+     *
+     * @param report the report being built
+     */
     private void appendTotalValue(StringBuilder report) {
+        LOGGER.info("appendTotalValue() called");
         long total = 0;
         for (Vehicle vehicle : vehicles) total += vehicle.getFinalPrice();
         report.append("4. Total Fleet Inventory Value: ").append(total).append('\n');
     }
 
+    /**
+     * Appends the hybrid vehicles whose final price is not above the average to the report.
+     *
+     * @param report the report being built
+     */
     private void appendFilteredHybrids(StringBuilder report) {
+        LOGGER.info("appendFilteredHybrids() called");
         long total = 0;
         for (Vehicle vehicle : vehicles) total += vehicle.getFinalPrice();
         double averagePrice = (double) total / vehicles.size();
@@ -136,7 +211,13 @@ public class Dealership {
         }
     }
 
+    /**
+     * Appends the number of vehicles younger than 5 years to the report.
+     *
+     * @param report the report being built
+     */
     private void appendYoungCount(StringBuilder report) {
+        LOGGER.info("appendYoungCount() called");
         int count = 0;
         for (Vehicle vehicle : vehicles) {
             if (vehicle.getAge() < 5) count++;
@@ -144,7 +225,13 @@ public class Dealership {
         report.append("6. Young Inventory Count: ").append(count).append('\n');
     }
 
+    /**
+     * Applies a 10% discount to the cheapest vehicle and appends the new price to the report.
+     *
+     * @param report the report being built
+     */
     private void appendDiscountSimulation(StringBuilder report) {
+        LOGGER.info("appendDiscountSimulation() called");
         Vehicle selected = vehicles.first();
         vehicles.remove(selected);
         selected.applyDiscount(10);
